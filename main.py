@@ -17,29 +17,60 @@ def fail(msg):
 def convert_to_ms(time_str):
     """Convert time string to milliseconds."""
     try:
+        total_ms = 0
+        current_num = ""
+        
+        for char in time_str:
+            if char.isdigit() or char == '.':
+                current_num += char
+            elif char in ['h', 'm', 's']:
+                if not current_num:
+                    raise ValueError("Invalid time format")
+                if char == 'h':
+                    total_ms += int(float(current_num) * 3600 * 1000)
+                elif char == 'm':
+                    total_ms += int(float(current_num) * 60 * 1000)
+                elif char == 's':
+                    total_ms += int(float(current_num) * 1000)
+                current_num = ""
+            else:
+                raise ValueError("Invalid character in time string")
+        
         if time_str.endswith("ms"):
-            return int(time_str[:-2])
-        elif time_str.endswith("s"):
-            return int(float(time_str[:-1]) * 1000)
-        elif time_str.endswith("m"):
-            return int(float(time_str[:-1]) * 60 * 1000)
-        elif time_str.endswith("h"):
-            return int(float(time_str[:-1]) * 3600 * 1000)
-        else:
-            raise ValueError("Couldn't parse time string: Possible formats: ms, s, m, h")
+            total_ms = int(time_str[:-2])
+        elif current_num:  # If there are remaining numbers without units
+            raise ValueError("Missing time unit")
+            
+        if total_ms == 0:
+            raise ValueError("Time must be greater than 0")
+            
+        return total_ms
     except ValueError as e:
         fail(e)
 
 def convert_to_string(ms):
     """Convert milliseconds to a human-readable string."""
-    if ms < 1000:
-        return f"{ms}ms"
-    elif ms < 60000:
-        return f"{ms // 1000}s"
-    elif ms < 3600000:
-        return f"{ms // 60000}m"
-    else:
-        return f"{ms // 3600000}h"
+    parts = []
+    
+    hours = ms // 3600000
+    if hours > 0:
+        parts.append(f"{hours}h")
+        ms %= 3600000
+        
+    minutes = ms // 60000
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+        ms %= 60000
+        
+    seconds = ms // 1000
+    if seconds > 0:
+        parts.append(f"{seconds}s")
+        ms %= 1000
+        
+    if ms > 0:
+        parts.append(f"{ms}ms")
+        
+    return "".join(parts) if parts else "0ms"
 
 def get_next_timer_name():
     """Get the next available timer name (timer1, timer2, etc.)"""
@@ -57,6 +88,38 @@ if sys.argv[1] == "get":
     for timer_file in os.listdir("timers"):
         with open(os.path.join("timers", timer_file), "r") as f:
             log(f"{timer_file}: {convert_to_string(int(f.read()))} remaining")
+    sys.exit(0)
+
+if sys.argv[1] == "clear":
+    if not os.path.exists("timers") or not os.listdir("timers"):
+        fail("No timers set")
+    for timer_file in os.listdir("timers"):
+        os.remove(os.path.join("timers", timer_file))
+    log("Cleared all timers")
+    sys.exit(0)
+if sys.argv[1] in ("help", "-h", "--help"):
+    print("""
+┌────┬───┐▗▄▄▄▖▗▄▄▄▖▗▖  ▗▖▗▄▄▄▖
+│    │   │  █    █  ▐▛▚▞▜▌  █ 
+│    │   │  █    █  ▐▌  ▐▌  █ 
+├────┘   │  █  ▗▄█▄▖▐▌  ▐▌▗▄█▄▖
+└────────┘    
+Usage: timi [time] [options]
+
+Options:
+    get        Get all timers
+    clear      Clear all timers
+    stop       Stop a timer
+    help       Show this help message
+    -h, --help Show this help message
+          
+How to set a Timer:
+    timi 10s     Set a timer for 10 seconds
+    timi 5m      Set a timer for 5 minutes
+    timi 1h      Set a timer for 1 hour
+    timi 100ms   Set a timer for 100 milliseconds
+    timi 1h30m  Set a timer for 1 hour and 30 minutes
+""")
     sys.exit(0)
 
 if sys.argv[1] == "stop":
