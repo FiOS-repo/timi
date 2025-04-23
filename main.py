@@ -46,10 +46,7 @@ if sys.argv[1] == "get":
         fail("No timer set")
     else:
         with open(".timerconfig", "r") as f:
-            log(c)
-
-if sys.argv[1] == "stop":
-    if not os.onvert_to_string(int(f.read())) + " remaining")
+            log(convert_to_string(int(f.read())) + " remaining")
     sys.exit(0)
 
 if sys.argv[1] == "stop":
