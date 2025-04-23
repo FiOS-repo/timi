@@ -41,38 +41,55 @@ def convert_to_string(ms):
     else:
         return f"{ms // 3600000}h"
 
+def get_next_timer_name():
+    """Get the next available timer name (timer1, timer2, etc.)"""
+    if not os.path.exists("timers"):
+        os.makedirs("timers")
+    existing = [f for f in os.listdir("timers") if f.startswith("timer")]
+    if not existing:
+        return "timer1"
+    numbers = [int(f[5:]) for f in existing]
+    return f"timer{max(numbers) + 1}"
+
 if sys.argv[1] == "get":
-    if not os.path.exists(".timerconfig"):
-        fail("No timer set")
-    else:
-        with open(".timerconfig", "r") as f:
-            log(convert_to_string(int(f.read())) + " remaining")
+    if not os.path.exists("timers") or not os.listdir("timers"):
+        fail("No timers set")
+    for timer_file in os.listdir("timers"):
+        with open(os.path.join("timers", timer_file), "r") as f:
+            log(f"{timer_file}: {convert_to_string(int(f.read()))} remaining")
     sys.exit(0)
 
 if sys.argv[1] == "stop":
-    if not os.path.exists(".timerconfig"):
-        fail("No timer set")
-    else:
-        # Kill any running timedeamon processes
-        subprocess.run(["pkill", "-f", "timedeamon.py"])
-        os.remove(".timerconfig")
-        log("Timer stopped")
+    if len(sys.argv) < 3:
+        fail("Please specify timer name")
+    timer_name = sys.argv[2]
+    timer_path = os.path.join("timers", timer_name)
+    if not os.path.exists(timer_path):
+        fail(f"Timer {timer_name} not found")
+    subprocess.run(["pkill", "-f", f"timedeamon.py {timer_path}"])
+    os.remove(timer_path)
+    log(f"Timer {timer_name} stopped")
     sys.exit(0)
     
 time = convert_to_ms(sys.argv[1])
+timer_name = get_next_timer_name()
+timer_path = os.path.join("timers", timer_name)
 
-with open(".timerconfig", "w") as f:
+if not os.path.exists("timers"):
+    os.makedirs("timers")
+
+with open(timer_path, "w") as f:
     f.write(str(time))
 
-log(f"Set timer to {sys.argv[1]}")
+log(f"Set {timer_name} to {sys.argv[1]}")
 
 # Start timedeamon in background
 daemon_process = subprocess.Popen([
     "python3",
     os.path.join(os.path.dirname(__file__), "timedeamon.py"),
     str(time),
-    ".timerconfig"
+    timer_path
 ])
 
-log("Started timer daemon")
+log(f"Started timer daemon for {timer_name}")
 sys.exit(0)
