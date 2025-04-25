@@ -1,25 +1,25 @@
 import sys
 import colorama
-import datetime
 import subprocess
-import atexit
 import os
+import signal
 
 def log(msg):
     """Prints a message to the console with [*] prefix."""
     print(colorama.Fore.GREEN + "\n[*] " + colorama.Fore.RESET + str(msg), end=" ")
+
 
 def fail(msg):
     """Prints a message to the console with [x] prefix and exits."""
     print(colorama.Fore.RED + "\n[x] " + colorama.Fore.RESET + str(msg), end=" ")
     sys.exit(1)
 
+
 def convert_to_ms(time_str):
     """Convert time string to milliseconds."""
     try:
         total_ms = 0
         current_num = ""
-        
         for char in time_str:
             if char.isdigit() or char == '.':
                 current_num += char
@@ -35,84 +35,158 @@ def convert_to_ms(time_str):
                 current_num = ""
             else:
                 raise ValueError("Invalid character in time string")
-        
+        # Handle ms suffix
         if time_str.endswith("ms"):
             total_ms = int(time_str[:-2])
-        elif current_num:  # If there are remaining numbers without units
+        elif current_num:
             raise ValueError("Missing time unit")
-            
         if total_ms == 0:
             raise ValueError("Time must be greater than 0")
-            
         return total_ms
     except ValueError as e:
         fail(e)
 
+
 def convert_to_string(ms):
     """Convert milliseconds to a human-readable string."""
     parts = []
-    
     hours = ms // 3600000
     if hours > 0:
         parts.append(f"{hours}h")
         ms %= 3600000
-        
     minutes = ms // 60000
     if minutes > 0:
         parts.append(f"{minutes}m")
         ms %= 60000
-        
     seconds = ms // 1000
     if seconds > 0:
         parts.append(f"{seconds}s")
         ms %= 1000
-        
     if ms > 0:
         parts.append(f"{ms}ms")
-        
     return "".join(parts) if parts else "0ms"
+
 
 def get_next_timer_name():
     """Get the next available timer name (timer1, timer2, etc.)"""
     if not os.path.exists("timers"):
         os.makedirs("timers")
-    existing = [f for f in os.listdir("timers") if f.startswith("timer")]
+    existing = [f for f in os.listdir("timers") if f.startswith("timer") and not f.endswith(".pid")]
     if not existing:
         return "timer1"
     numbers = [int(f[5:]) for f in existing]
     return f"timer{max(numbers) + 1}"
 
-if sys.argv[1] == "get":
-    if not os.path.exists("timers") or not os.listdir("timers"):
+
+def start_timer_daemon(time_ms, timer_path):
+    """Start the background daemon and record its PID."""
+    daemon_script = os.path.join(os.path.dirname(__file__), "timedeamon.py")
+    proc = subprocess.Popen(["python3", daemon_script, str(time_ms), timer_path])
+    with open(f"{timer_path}.pid", "w") as pidf:
+        pidf.write(str(proc.pid))
+    log(f"Started timer daemon for {os.path.basename(timer_path)}")
+
+
+# Ensure command provided
+if len(sys.argv) < 2:
+    fail("Please provide a command. Use 'help' for options.")
+
+cmd = sys.argv[1]
+
+# GET command: list timers, showing paused state
+if cmd == "get":
+    if not os.path.exists("timers") or not any(f for f in os.listdir("timers") if not f.endswith(".pid")):
         fail("No timers set")
-    for timer_file in os.listdir("timers"):
-        with open(os.path.join("timers", timer_file), "r") as f:
-            log(f"{timer_file}: {convert_to_string(int(f.read()))} remaining")
+    for fname in sorted(os.listdir("timers")):
+        if fname.endswith(".pid"):  # skip pid files
+            continue
+        path = os.path.join("timers", fname)
+        with open(path) as tf:
+            remaining = int(tf.read().strip())
+        paused = not os.path.exists(f"{path}.pid")
+        status = " (paused)" if paused else ""
+        log(f"{fname}: {convert_to_string(remaining)} remaining{status}")
     sys.exit(0)
 
-if sys.argv[1] == "clear":
-    if not os.path.exists("timers") or not os.listdir("timers"):
+# CLEAR command
+if cmd == "clear":
+    if not os.path.exists("timers") or not any(f for f in os.listdir("timers") if not f.endswith(".pid")):
         fail("No timers set")
-    for timer_file in os.listdir("timers"):
-        os.remove(os.path.join("timers", timer_file))
+    for fname in os.listdir("timers"):
+        if not fname.endswith(".pid"):
+            os.remove(os.path.join("timers", fname))
+        else:
+            os.remove(os.path.join("timers", fname))
     log("Cleared all timers")
     sys.exit(0)
-if sys.argv[1] in ("help", "-h", "--help"):
-    print("""
+
+# REMOVE command
+if cmd == "remove":
+    if len(sys.argv) < 3:
+        fail("Please specify timer name")
+    name = sys.argv[2]
+    path = os.path.join("timers", name)
+    pid_path = f"{path}.pid"
+    if not os.path.exists(path):
+        fail(f"Timer {name} not found")
+    # kill daemon if running
+    if os.path.exists(pid_path):
+        with open(pid_path) as pf:
+            try:
+                os.kill(int(pf.read()), signal.SIGTERM)
+            except Exception:
+                pass
+        os.remove(pid_path)
+    os.remove(path)
+    log(f"Timer {name} removed")
+    sys.exit(0)
+
+# TOGGLE command: pause or resume
+if cmd == "toggle":
+    if len(sys.argv) < 3:
+        fail("Please specify timer name")
+    name = sys.argv[2]
+    path = os.path.join("timers", name)
+    pid_path = f"{path}.pid"
+    if not os.path.exists(path):
+        fail(f"Timer {name} not found")
+    # If running, pause it
+    if os.path.exists(pid_path):
+        with open(pid_path) as pf:
+            try:
+                os.kill(int(pf.read()), signal.SIGTERM)
+            except Exception:
+                pass
+        os.remove(pid_path)
+        log(f"Timer {name} paused")
+    else:
+        # resume from remaining
+        with open(path) as tf:
+            remaining = int(tf.read().strip())
+        if remaining <= 0:
+            fail(f"Timer {name} already finished")
+        start_timer_daemon(remaining, path)
+        log(f"Timer {name} resumed")
+    sys.exit(0)
+
+# HELP command
+if cmd in ("help", "-h", "--help"):
+    print("""        
 ┌────┬───┐▗▄▄▄▖▗▄▄▄▖▗▖  ▗▖▗▄▄▄▖
-│    │   │  █    █  ▐▛▚▞▜▌  █ 
+│    │   │  █    █  ▐▛▚▞▜▌  █  
 │    │   │  █    █  ▐▌  ▐▌  █ 
 ├────┘   │  █  ▗▄█▄▖▐▌  ▐▌▗▄█▄▖
-└────────┘    
+└────────┘
 Usage: timi [time] [options]
 
 Options:
     get        Get all timers
     clear      Clear all timers
-    stop       Stop a timer
+    remove     Removes a timer
+    toggle     Pauses or resumes a timer
     help       Show this help message
     -h, --help Show this help message
-          
+
 How to set a Timer:
     timi 10s     Set a timer for 10 seconds
     timi 5m      Set a timer for 5 minutes
@@ -122,37 +196,20 @@ How to set a Timer:
 """)
     sys.exit(0)
 
-if sys.argv[1] == "stop":
-    if len(sys.argv) < 3:
-        fail("Please specify timer name")
-    timer_name = sys.argv[2]
-    timer_path = os.path.join("timers", timer_name)
-    if not os.path.exists(timer_path):
-        fail(f"Timer {timer_name} not found")
-    subprocess.run(["pkill", "-f", f"timedeamon.py {timer_path}"])
-    os.remove(timer_path)
-    log(f"Timer {timer_name} stopped")
-    sys.exit(0)
-    
-time = convert_to_ms(sys.argv[1])
-timer_name = get_next_timer_name()
-timer_path = os.path.join("timers", timer_name)
+# DEFAULT: set a new timer
+# interpret first argument as time
+try:
+    ms = convert_to_ms(cmd)
+except SystemExit:
+    sys.exit(1)
 
+name = get_next_timer_name()
+path = os.path.join("timers", name)
 if not os.path.exists("timers"):
     os.makedirs("timers")
+with open(path, "w") as f:
+    f.write(str(ms))
 
-with open(timer_path, "w") as f:
-    f.write(str(time))
-
-log(f"Set {timer_name} to {sys.argv[1]}")
-
-# Start timedeamon in background
-daemon_process = subprocess.Popen([
-    "python3",
-    os.path.join(os.path.dirname(__file__), "timedeamon.py"),
-    str(time),
-    timer_path
-])
-
-log(f"Started timer daemon for {timer_name}")
+log(f"Set {name} to {cmd}")
+start_timer_daemon(ms, path)
 sys.exit(0)
