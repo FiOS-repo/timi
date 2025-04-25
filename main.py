@@ -4,6 +4,9 @@ import subprocess
 import os
 import signal
 
+TIMER_DIR = "/var/timi/timers"
+
+
 def log(msg):
     """Prints a message to the console with [*] prefix."""
     print(colorama.Fore.GREEN + "\n[*] " + colorama.Fore.RESET + str(msg), end=" ")
@@ -69,9 +72,9 @@ def convert_to_string(ms):
 
 def get_next_timer_name():
     """Get the next available timer name (timer1, timer2, etc.)"""
-    if not os.path.exists("timers"):
-        os.makedirs("timers")
-    existing = [f for f in os.listdir("timers") if f.startswith("timer") and not f.endswith(".pid")]
+    if not os.path.exists(TIMER_DIR):
+        os.makedirs(TIMER_DIR, exist_ok=True)
+    existing = [f for f in os.listdir(TIMER_DIR) if f.startswith("timer") and not f.endswith(".pid")]
     if not existing:
         return "timer1"
     numbers = [int(f[5:]) for f in existing]
@@ -95,12 +98,12 @@ cmd = sys.argv[1]
 
 # GET command: list timers, showing paused state
 if cmd == "get":
-    if not os.path.exists("timers") or not any(f for f in os.listdir("timers") if not f.endswith(".pid")):
+    if not os.path.exists(TIMER_DIR) or not any(f for f in os.listdir(TIMER_DIR) if not f.endswith(".pid")):
         fail("No timers set")
-    for fname in sorted(os.listdir("timers")):
+    for fname in sorted(os.listdir(TIMER_DIR)):
         if fname.endswith(".pid"):  # skip pid files
             continue
-        path = os.path.join("timers", fname)
+        path = os.path.join(TIMER_DIR, fname)
         with open(path) as tf:
             remaining = int(tf.read().strip())
         paused = not os.path.exists(f"{path}.pid")
@@ -110,13 +113,10 @@ if cmd == "get":
 
 # CLEAR command
 if cmd == "clear":
-    if not os.path.exists("timers") or not any(f for f in os.listdir("timers") if not f.endswith(".pid")):
+    if not os.path.exists(TIMER_DIR) or not any(f for f in os.listdir(TIMER_DIR) if not f.endswith(".pid")):
         fail("No timers set")
-    for fname in os.listdir("timers"):
-        if not fname.endswith(".pid"):
-            os.remove(os.path.join("timers", fname))
-        else:
-            os.remove(os.path.join("timers", fname))
+    for fname in os.listdir(TIMER_DIR):
+        os.remove(os.path.join(TIMER_DIR, fname))
     log("Cleared all timers")
     sys.exit(0)
 
@@ -125,7 +125,7 @@ if cmd == "remove":
     if len(sys.argv) < 3:
         fail("Please specify timer name")
     name = sys.argv[2]
-    path = os.path.join("timers", name)
+    path = os.path.join(TIMER_DIR, name)
     pid_path = f"{path}.pid"
     if not os.path.exists(path):
         fail(f"Timer {name} not found")
@@ -146,7 +146,7 @@ if cmd == "toggle":
     if len(sys.argv) < 3:
         fail("Please specify timer name")
     name = sys.argv[2]
-    path = os.path.join("timers", name)
+    path = os.path.join(TIMER_DIR, name)
     pid_path = f"{path}.pid"
     if not os.path.exists(path):
         fail(f"Timer {name} not found")
@@ -204,9 +204,9 @@ except SystemExit:
     sys.exit(1)
 
 name = get_next_timer_name()
-path = os.path.join("timers", name)
-if not os.path.exists("timers"):
-    os.makedirs("timers")
+path = os.path.join(TIMER_DIR, name)
+if not os.path.exists(TIMER_DIR):
+    os.makedirs(TIMER_DIR, exist_ok=True)
 with open(path, "w") as f:
     f.write(str(ms))
 

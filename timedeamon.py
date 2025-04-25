@@ -2,6 +2,11 @@ import sys
 import time
 import os
 
+TIMER_DIR = "/var/timi/timers"
+
+if not os.path.exists(TIMER_DIR):
+    os.makedirs(TIMER_DIR, exist_ok=True)
+
 target_time = int(sys.argv[1])  # in ms
 timerfile = sys.argv[2]
 remaining_time = target_time
