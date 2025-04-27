@@ -7,7 +7,7 @@ pkgdesc="A simple CLI timer utility"
 arch=('any')
 url="https://github.com/FiOS-repo/timi"
 license=('MIT')
-depends=('python' 'python-colorama')
+depends=('python' 'python-colorama' 'python-plyer')
 makedepends=('git')
 source=("git+https://github.com/FiOS-repo/timi.git#branch=master")
 sha256sums=('SKIP')
