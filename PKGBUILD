@@ -1,7 +1,7 @@
 # Maintainer: Finn <github.com/FiOS-repo>
 
 pkgname=timi
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="A simple CLI timer utility"
 arch=('any')
