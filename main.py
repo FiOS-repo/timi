@@ -3,6 +3,7 @@ import colorama
 import subprocess
 import os
 import signal
+import shutil
 
 TIMER_DIR = "/var/timi/timers"
 
@@ -16,6 +17,11 @@ def fail(msg):
     """Prints a message to the console with [x] prefix and exits."""
     print(colorama.Fore.RED + "\n[x] " + colorama.Fore.RESET + str(msg), end=" ")
     sys.exit(1)
+
+def info(msg):
+    """Prints a message to the console with [i] prefix."""
+    print(colorama.Fore.YELLOW + "\n[i] " + colorama.Fore.RESET + str(msg), end=" ")
+
 
 
 def convert_to_ms(time_str):
@@ -113,13 +119,30 @@ if cmd == "get":
 
 # CLEAR command
 if cmd == "clear":
-    if not os.path.exists(TIMER_DIR) or not any(f for f in os.listdir(TIMER_DIR) if not f.endswith(".pid")):
-        fail("No timers set")
+    if not os.path.exists(TIMER_DIR):
+        fail("No timers to clear")
+
     for fname in os.listdir(TIMER_DIR):
-        os.remove(os.path.join(TIMER_DIR, fname))
+        file_path = os.path.join(TIMER_DIR, fname)
+
+        if not os.path.isfile(file_path):
+            continue  # skip directories, just to be sure
+
+        if fname.endswith(".pid"):
+            # Kill the daemon process first
+            try:
+                with open(file_path) as pf:
+                    pid = int(pf.read())
+                    os.kill(pid, signal.SIGTERM)
+            except Exception as e:
+                info(f"Could not kill process {fname}: {e}")
+
+        # Now delete the file
+        os.remove(file_path)
+
     log("Cleared all timers")
     sys.exit(0)
-
+    
 # REMOVE command
 if cmd == "remove":
     if len(sys.argv) < 3:
@@ -192,7 +215,7 @@ How to set a Timer:
     timi 5m      Set a timer for 5 minutes
     timi 1h      Set a timer for 1 hour
     timi 100ms   Set a timer for 100 milliseconds
-    timi 1h30m  Set a timer for 1 hour and 30 minutes
+    timi 1h30m   Set a timer for 1 hour and 30 minutes
 """)
     sys.exit(0)
 
@@ -211,5 +234,8 @@ with open(path, "w") as f:
     f.write(str(ms))
 
 log(f"Set {name} to {cmd}")
+if shutil.which("notify-send") is  None:
+    info("notify-send is not avabiale. You won't get a notification if a timer finishes. But you still get Sound and in the Terminal.")
 start_timer_daemon(ms, path)
+
 sys.exit(0)
