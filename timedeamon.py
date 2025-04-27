@@ -40,7 +40,7 @@ while True:
                     title='TIMI - Timer notifications',
                     message=f"Time's up for {os.path.basename(timerfile)}!",
                     app_icon=None,
-                    timeout=10,
+                    timeout='10',
                 )
             print(f"Time's up for {os.path.basename(timerfile)}!")
             os.remove(timerfile)

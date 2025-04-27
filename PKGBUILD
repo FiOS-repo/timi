@@ -7,10 +7,18 @@ pkgdesc="A simple CLI timer utility"
 arch=('any')
 url="https://github.com/FiOS-repo/timi"
 license=('MIT')
-depends=('python' 'python-colorama' 'python-plyer')
-makedepends=('git')
-source=("git+https://github.com/FiOS-repo/timi.git#branch=master")
-sha256sums=('SKIP')
+depends=('python' 'python-colorama' 'python-notify2')
+makedepends=('git' 'python-build' 'python-installer' 'python-wheel')
+source=("git+https://github.com/FiOS-repo/timi.git#branch=master"
+        "git+https://aur.archlinux.org/python-plyer.git")
+sha256sums=('SKIP'
+            'SKIP')
+
+prepare() {
+    # Build python-plyer from AUR
+    cd "$srcdir/python-plyer"
+    makepkg -si --noconfirm
+}
 
 package() {
     cd "$srcdir/$pkgname"
