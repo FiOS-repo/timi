@@ -2,10 +2,13 @@ import sys
 import time
 import os
 import shutil
-from plyer import notification
+import notify2
 import contextlib
 
 TIMER_DIR = "/var/timi/timers"
+
+# Initialize notify2
+notify2.init("TIMI")
 
 # Helper to suppress output (stdout and stderr)
 @contextlib.contextmanager
@@ -36,12 +39,11 @@ while True:
 
         if remaining_time <= 0:
             with suppress_output():
-                notification.notify(
-                    title='TIMI - Timer notifications',
-                    message=f"Time's up for {os.path.basename(timerfile)}!",
-                    app_icon=None,
-                    timeout=10,
+                notification = notify2.Notification(
+                    "TIMI - Timer notifications",
+                    f"Time's up for {os.path.basename(timerfile)}!"
                 )
+                notification.show()
             print(f"Time's up for {os.path.basename(timerfile)}!")
             os.remove(timerfile)
             sys.exit(0)
