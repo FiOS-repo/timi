@@ -192,6 +192,17 @@ if cmd == "toggle":
         log(f"Timer {name} resumed")
     sys.exit(0)
 
+
+if cmd == "extend":
+    if len(sys.argv) < 4:
+        fail("Please specify timer name and new duration")
+    name = sys.argv[2]
+    newdur = sys.argv[3]
+    path = os.path.join(TIMER_DIR, name)
+    pid_path = f"{path}.pid"
+    
+    if not os.path.exists(pid_path):
+        fail(f"Timer {name} not found")
 # HELP command
 if cmd in ("help", "-h", "--help"):
     print("""        
