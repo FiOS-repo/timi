@@ -1,5 +1,7 @@
 # Timi - Simple Command Line Timer
 
+![Timi in action](assets/usingtimi.png)
+
 Timi is a lightweight command-line timer application that allows you to set and manage multiple concurrent timers.
 
 ## Features
