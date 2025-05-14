@@ -218,6 +218,7 @@ Options:
     clear      Clear all timers
     remove     Removes a timer
     toggle     Pauses or resumes a timer
+    extend     Extends a timer
     help       Show this help message
     -h, --help Show this help message
 
